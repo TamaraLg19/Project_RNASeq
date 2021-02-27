@@ -178,7 +178,7 @@ head(df)
 ```
 
 Perfiles de expresión en el DLPFC entre muestras de subtipos
-```{r}
+```{r eval=FALSE, include=FALSE}
 # Heatmap
 pdf("pheatmap_project.pdf", height = 14, useDingbats = FALSE)
 pheatmap(
