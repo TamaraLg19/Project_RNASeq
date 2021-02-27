@@ -4,13 +4,13 @@ author: "Tamara López González"
 documentclass: book
 output:
   html_document:
-    theme: journal
+    theme: readable
     toc: true
 ---
 
 ## Proyecto expresión diferencial
 
-### 1. Perfil transcripcional de un panel de línea celular de cáncer de mama utilizando tecnología RNAseq
+### Perfil transcripcional de un panel de línea celular de cáncer de mama utilizando tecnología RNAseq
 56 breast cancer cell lines were profiled to identify patterns of gene expression associated with subtype and response to therapeutic compounds. Overall design: Cell lines were profiled in their baseline, unperturbed state.
 ------------- SRP026537
 
