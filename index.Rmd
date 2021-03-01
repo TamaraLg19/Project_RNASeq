@@ -5,30 +5,41 @@ documentclass: book
 output:
   html_document:
     theme: readable
+    highlight: haddock
     toc: true
+    toc_depth: 3
+    toc_float: yes
 ---
 
-## Proyecto expresión diferencial
+### Proyecto expresión diferencial
 
-### Perfil transcripcional de un panel de línea celular de cáncer de mama utilizando tecnología RNAseq
-56 breast cancer cell lines were profiled to identify patterns of gene expression associated with subtype and response to therapeutic compounds. Overall design: Cell lines were profiled in their baseline, unperturbed state.
+#### Perfil transcripcional de un panel de línea celular de cáncer de mama utilizando tecnología RNAseq
 ------------- SRP026537
+
+
+
+56 breast cancer cell lines were profiled to identify patterns of gene expression associated with subtype and response to therapeutic compounds. Overall design: Cell lines were profiled in their baseline, unperturbed state.
+Información en: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE48213
 
 ### Obtención de información
 
+Cargar librerías y paquetes necesarios:
 ```{r message=FALSE}
 library("recount3")
 library("edgeR")
 library("ggplot2")
 library("limma")
 library("pheatmap")
+library("RColorBrewer")
 ```
 
-```{r}
+Obtener proyectos 
+```{r message=FALSE}
 human_projects <- available_projects()
 ```
 
-```{r}
+Extraer la información del proyecto elegido (previamente se analizaron los proyectos en la página web):
+```{r message=FALSE}
 rse_gene_SRP026537 <- create_rse(
     subset(
         human_projects,
@@ -39,6 +50,7 @@ rse_gene_SRP026537 <- create_rse(
 assay(rse_gene_SRP026537, "counts") <- compute_read_counts(rse_gene_SRP026537)
 ```
 
+##### Información: 
 ```{r}
 rse_gene_SRP026537
 ```
@@ -51,51 +63,52 @@ colData(rse_gene_SRP026537)[
     grepl("^sra_attribute", colnames(colData(rse_gene_SRP026537)))
 ]
 ```
-Las columnas de 'cell_type' y 'source_name' no son informativas. 
+Las columnas de 'cell_type' y 'source_name' no son informativas porque los estados no cambian. Por el contrario, las columnas de 'cell_line' y 'subtype' sí son informativas. 
 
 ### Evaluar, limpiar y normalizar datos
 
+Conocer niveles (estados posibles) de las columnas informativas:
 ```{r}
-# Conocer niveles de columnas informativas
 table(rse_gene_SRP026537$sra_attribute.cell_line)
 table(rse_gene_SRP026537$sra_attribute.subtype)
 ```
 
+Evaluar muestras y diferencias por medio de 'recount_qc.gene_fc_count_all':
 ```{r}
-# Evaluar muestras y diferencias
 rse_gene_SRP026537$assigned_gene_prop <- rse_gene_SRP026537$recount_qc.gene_fc_count_all.assigned / rse_gene_SRP026537$recount_qc.gene_fc_count_all.total
 summary(rse_gene_SRP026537$assigned_gene_prop)
 ```
 
-Parece no haber muestras de baja calidad. 
+Cuando se hace el histograma de la calidad de las muestras, parece que la calidad mayoritaria es media con pocas muestras de alta calidad y ninguna por debajo de 0.35. Considerando no eliminar muestras. 
 ```{r}
 hist(x = rse_gene_SRP026537$assigned_gene_prop, col = "peachpuff1")
 ```
-
+Tomando la columna informativa con menos niveles, se pueden obtener las diferencias entre grupos de subtipos:
 ```{r}
-# Diferencias entre grupos de subtipos 
 with(colData(rse_gene_SRP026537), tapply(assigned_gene_prop, sra_attribute.subtype, summary))
 ```
 
+Calcular los niveles medios de expresión de los genes en las muestras.
 ```{r}
-# Calcular los niveles medios de expresión de los genes en las muestras.
 gene_means <- rowMeans(assay(rse_gene_SRP026537, "counts"))
 summary(gene_means)
 ```
 
-Eliminar genes con niveles de expresión muy bajos
+Eliminar genes con niveles de expresión muy bajos (por debajo del primer cuartil): 
 ```{r}
-# Limpieza de genes con niveles de expresión
 rse_gene_SRP026537_unfiltered <- rse_gene_SRP026537
 rse_gene_SRP026537 <- rse_gene_SRP026537[gene_means > 0.05, ]
+```
 
-# Resultado por dimensiones y porcentaje
+Resultado por dimensiones y porcentaje:
+* Se preservaron el 74.76% de los genes. 
+```{r}
 dim(rse_gene_SRP026537)
 round(nrow(rse_gene_SRP026537) / nrow(rse_gene_SRP026537_unfiltered) * 100, 2)
 
 ```
 
-Normalizar datos de la limpieza
+Normalizar datos de la limpieza:
 ```{r}
 dge <- DGEList(
     counts = assay(rse_gene_SRP026537, "counts"),
@@ -106,8 +119,9 @@ dge <- calcNormFactors(dge)
 ```
 
 ### Análisis y expresión diferencial
+Explorar datos de expresión por subtipos con gráficas 'boxplot':
+Hay una tendencia descendiente desde la categoría 'basal' hasta la 'non-malignant' y, al final, se puede observar una menor expresión en subtipos 'unknown'.
 ```{r}
-# Explorar datos de expresión por subtipos con gráficas
 ggplot(as.data.frame(colData(rse_gene_SRP026537)), aes(y = assigned_gene_prop, x = sra_attribute.subtype)) +
     geom_boxplot(fill = c("lightblue2", "pink1", "palegreen3", "thistle2", "darkseagreen2")) +
     theme_bw(base_size = 20) +
@@ -115,9 +129,9 @@ ggplot(as.data.frame(colData(rse_gene_SRP026537)), aes(y = assigned_gene_prop, x
     xlab("Subtype")
 
 ```
-Explorar expresión interactivamente con iSEE
+Explorar expresión interactivamente con iSEE:
+Al igual que con la boxplot, en la gráfica se aprecia la expresión por los diferentes subtipos. Se ve más claramente que 'luminal' abarca mayor área del gráfico y 'basal' es el de mayor expresión.
 ```{r eval= FALSE}
-# Explorar expresión interactivamente con iSEE
 iSEE::iSEE(rse_gene_SRP026537)
 ```
 
@@ -125,9 +139,8 @@ iSEE::iSEE(rse_gene_SRP026537)
 
 ![iSEE](/Users/Tami/expresion-subtypes.jpg)
 
-Análisis con modelo estadístico
+Análisis con modelo estadístico únicamente con los subtipos (referencia 'basal'). 
 ```{r}
-# Modelo estadístico por subtipos
 mod <- model.matrix(~ sra_attribute.subtype + assigned_gene_prop,
     data = colData(rse_gene_SRP026537)
 )
@@ -135,11 +148,11 @@ mod <- model.matrix(~ sra_attribute.subtype + assigned_gene_prop,
 colnames(mod)
 ```
 
+##### Expresión diferencial 
+Modelos de regresión lineal para analizar la desviación estandar de la expresión media desde la línea roja. Atenuar la desviación podría ser una estrategia para más análisis. 
 ```{r}
-# Expresión diferencial 
 vGene <- voom(dge, mod, plot = TRUE)
 ```
-
 ```{r}
 eb_results <- eBayes(lmFit(vGene))
 
@@ -152,34 +165,36 @@ de_results <- topTable(
 dim(de_results)
 ```
 
+Resultados del modelo: 
 ```{r}
 head(de_results)
 ```
-
+Genes diferencialmente expresados entre 'subtypes' con FDR < 5%
 ```{r}
-# Genes diferencialmente expresados entre 'subtypes' con FDR < 5%
 table(de_results$adj.P.Val < 0.05)
 ```
 
+Extraer valores de los genes de interés:
 ```{r}
-# Visualizar los resultados estadísticos
-plotMA(eb_results, coef = 2)
+exprs_heatmap <- vGene$E[rank(de_results$adj.P.Val) <= 50, ]
 ```
 
+Tabla (data frame) con información de las muestras y con nombres de columnas
 ```{r}
-# Extraer valores de los genes de interés
-exprs_heatmap <- vGene$E[rank(de_results$adj.P.Val) <= 50, ]
-
-# Tabla con información de las muestras y con nombres de columnas 
 df <- as.data.frame(colData(rse_gene_SRP026537)[, c("sra_attribute.subtype", "sra_attribute.cell_line")])
 colnames(df) <- c("Subtype", "CellLine")
 
 head(df)
 ```
 
-Perfiles de expresión en el DLPFC entre muestras de subtipos
+Gráfica de la expresión de los genes dependiendo del subtipo:
+* La cantidad de categorías usadas hace difícil el estudio de expresión por este medio; sin embargo, se nota que 'claudin-low' predomina en la esquina superior derecha.
+```{r}
+plotMDS(vGene$E, labels = df$Subtype , col = brewer.pal(5, "Set1"))
+```
+
+Perfiles de expresión entre muestras de subtipos con un Heatmap con clustering y las categorías de 'subtype' y 'cell line':
 ```{r eval=FALSE, include=FALSE}
-# Heatmap
 pdf("pheatmap_project.pdf", height = 14, useDingbats = FALSE)
 pheatmap(
     exprs_heatmap,
